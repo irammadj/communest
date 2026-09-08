@@ -1,0 +1,10 @@
+{
+  "description": "Creates a streamlined website frontend strictly following user prompts, ensuring precise design without any added elements for clear, focused web presence.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
