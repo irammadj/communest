@@ -1,10 +1,19 @@
-import { projectId } from '../../utils/supabase/info';
+import { projectId } from "../../utils/supabase/info";
 
-const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-5d5fb4b7`;
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  `https://${projectId}.supabase.co/functions/v1/make-server-5d5fb4b7`;
 
-async function request<T>(method: string, path: string, body?: unknown, token?: string): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  token?: string,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
     headers,
@@ -12,7 +21,7 @@ async function request<T>(method: string, path: string, body?: unknown, token?: 
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(error.message ?? 'Request failed');
+    throw new Error(error.message ?? "Request failed");
   }
   return res.json() as Promise<T>;
 }
@@ -20,26 +29,32 @@ async function request<T>(method: string, path: string, body?: unknown, token?: 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const auth = {
-  register: (payload: { name: string; email: string; phone: string; password: string }) =>
-    request<{ message: string }>('POST', '/auth/register', payload),
+  register: (payload: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+  }) => request<{ message: string }>("POST", "/auth/register", payload),
 
   login: (payload: { email: string; password: string }) =>
-    request<{ token: string; user: UserDTO }>('POST', '/auth/login', payload),
+    request<{ token: string; user: UserDTO }>("POST", "/auth/login", payload),
 
   logout: (token: string) =>
-    request<{ message: string }>('POST', '/auth/logout', undefined, token),
+    request<{ message: string }>("POST", "/auth/logout", undefined, token),
 };
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export const profile = {
-  get: (token: string) => request<UserDTO>('GET', '/profile', undefined, token),
+  get: (token: string) => request<UserDTO>("GET", "/profile", undefined, token),
 
-  update: (token: string, payload: Partial<{ name: string; phone: string; profilePicture: string }>) =>
-    request<UserDTO>('PATCH', '/profile', payload, token),
+  update: (
+    token: string,
+    payload: Partial<{ name: string; phone: string; profilePicture: string }>,
+  ) => request<UserDTO>("PATCH", "/profile", payload, token),
 
   deleteAccount: (token: string) =>
-    request<{ message: string }>('DELETE', '/profile', undefined, token),
+    request<{ message: string }>("DELETE", "/profile", undefined, token),
 };
 
 // ─── Estates ──────────────────────────────────────────────────────────────────
@@ -47,117 +62,229 @@ export const profile = {
 export const estates = {
   list: (params?: { county?: string; maxRent?: number; search?: string }) => {
     const qs = new URLSearchParams();
-    if (params?.county) qs.set('county', params.county);
-    if (params?.maxRent) qs.set('maxRent', String(params.maxRent));
-    if (params?.search) qs.set('search', params.search);
+    if (params?.county) qs.set("county", params.county);
+    if (params?.maxRent) qs.set("maxRent", String(params.maxRent));
+    if (params?.search) qs.set("search", params.search);
     const query = qs.toString();
-    return request<EstateDTO[]>('GET', `/estates${query ? `?${query}` : ''}`);
+    return request<EstateDTO[]>("GET", `/estates${query ? `?${query}` : ""}`);
   },
 
-  get: (id: string) => request<EstateDTO>('GET', `/estates/${id}`),
+  get: (id: string) => request<EstateDTO>("GET", `/estates/${id}`),
 
   create: (token: string, payload: CreateEstatePayload) =>
-    request<EstateDTO>('POST', '/estates', payload, token),
+    request<EstateDTO>("POST", "/estates", payload, token),
 
-  updateStatus: (token: string, id: string, status: 'approved' | 'denied') =>
-    request<EstateDTO>('PATCH', `/estates/${id}/status`, { status }, token),
+  updateStatus: (token: string, id: string, status: "approved" | "denied") =>
+    request<EstateDTO>("PATCH", `/estates/${id}/status`, { status }, token),
 
   updatePhoto: (token: string, id: string, estatePhoto: string) =>
-    request<EstateDTO>('PATCH', `/estates/${id}/photo`, { estatePhoto }, token),
+    request<EstateDTO>("PATCH", `/estates/${id}/photo`, { estatePhoto }, token),
+
+  addAdmin: (token: string, estateId: string, email: string) =>
+    request<{ message: string }>(
+      "POST",
+      `/estates/${estateId}/admins`,
+      { email },
+      token,
+    ),
 };
 
 // ─── Houses ───────────────────────────────────────────────────────────────────
 
 export const houses = {
   list: (estateId: string) =>
-    request<HouseDTO[]>('GET', `/estates/${estateId}/houses`),
+    request<HouseDTO[]>("GET", `/estates/${estateId}/houses`),
 
   create: (token: string, estateId: string, payload: CreateHousePayload) =>
-    request<HouseDTO>('POST', `/estates/${estateId}/houses`, payload, token),
+    request<HouseDTO>("POST", `/estates/${estateId}/houses`, payload, token),
 
-  updateStatus: (token: string, id: string, status: 'vacant' | 'occupied') =>
-    request<HouseDTO>('PATCH', `/houses/${id}/status`, { status }, token),
+  updateStatus: (token: string, id: string, status: "vacant" | "occupied") =>
+    request<HouseDTO>("PATCH", `/houses/${id}/status`, { status }, token),
 
-  updatePayment: (token: string, id: string, paymentStatus: 'paid' | 'pending') =>
-    request<HouseDTO>('PATCH', `/houses/${id}/payment`, { paymentStatus }, token),
+  updatePayment: (
+    token: string,
+    id: string,
+    paymentStatus: "paid" | "pending",
+  ) =>
+    request<HouseDTO>(
+      "PATCH",
+      `/houses/${id}/payment`,
+      { paymentStatus },
+      token,
+    ),
 };
 
 // ─── Proposals ────────────────────────────────────────────────────────────────
 
 export const proposals = {
-  create: (payload: { estateId: string; houseId: string; name: string; email: string; phone: string }) =>
-    request<{ message: string; proposalId: string }>('POST', '/proposals', payload),
+  create: (payload: {
+    estateId: string;
+    houseId: string;
+    name: string;
+    email: string;
+    phone: string;
+  }) =>
+    request<{ message: string; proposalId: string }>(
+      "POST",
+      "/proposals",
+      payload,
+    ),
 
   list: (token: string, estateId: string) =>
-    request<ProposalDTO[]>('GET', `/estates/${estateId}/proposals`, undefined, token),
+    request<ProposalDTO[]>(
+      "GET",
+      `/estates/${estateId}/proposals`,
+      undefined,
+      token,
+    ),
 
-  updateStatus: (token: string, id: string, status: 'approved' | 'rejected') =>
-    request<ProposalDTO>('PATCH', `/proposals/${id}/status`, { status }, token),
+  updateStatus: (token: string, id: string, status: "approved" | "rejected") =>
+    request<ProposalDTO>("PATCH", `/proposals/${id}/status`, { status }, token),
 };
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export const notifications = {
   list: (token: string, estateId: string) =>
-    request<NotificationDTO[]>('GET', `/estates/${estateId}/notifications`, undefined, token),
+    request<NotificationDTO[]>(
+      "GET",
+      `/estates/${estateId}/notifications`,
+      undefined,
+      token,
+    ),
 
-  create: (token: string, estateId: string, payload: { title: string; eventDate: string; description: string }) =>
-    request<NotificationDTO>('POST', `/estates/${estateId}/notifications`, payload, token),
+  create: (
+    token: string,
+    estateId: string,
+    payload: { title: string; eventDate: string; description: string },
+  ) =>
+    request<NotificationDTO>(
+      "POST",
+      `/estates/${estateId}/notifications`,
+      payload,
+      token,
+    ),
 
   delete: (token: string, id: string) =>
-    request<{ message: string }>('DELETE', `/notifications/${id}`, undefined, token),
+    request<{ message: string }>(
+      "DELETE",
+      `/notifications/${id}`,
+      undefined,
+      token,
+    ),
 };
 
 // ─── Maintenance ──────────────────────────────────────────────────────────────
 
 export const maintenance = {
   list: (token: string, estateId: string) =>
-    request<MaintenanceDTO[]>('GET', `/estates/${estateId}/maintenance`, undefined, token),
+    request<MaintenanceDTO[]>(
+      "GET",
+      `/estates/${estateId}/maintenance`,
+      undefined,
+      token,
+    ),
 
-  create: (token: string, estateId: string, payload: { title: string; description: string }) =>
-    request<MaintenanceDTO>('POST', `/estates/${estateId}/maintenance`, payload, token),
+  create: (
+    token: string,
+    estateId: string,
+    payload: { title: string; description: string },
+  ) =>
+    request<MaintenanceDTO>(
+      "POST",
+      `/estates/${estateId}/maintenance`,
+      payload,
+      token,
+    ),
 
-  updateStatus: (token: string, id: string, status: 'scheduled' | 'in_progress' | 'resolved') =>
-    request<MaintenanceDTO>('PATCH', `/maintenance/${id}/status`, { status }, token),
+  updateStatus: (
+    token: string,
+    id: string,
+    status: "scheduled" | "in_progress" | "resolved",
+  ) =>
+    request<MaintenanceDTO>(
+      "PATCH",
+      `/maintenance/${id}/status`,
+      { status },
+      token,
+    ),
 
   delete: (token: string, id: string) =>
-    request<{ message: string }>('DELETE', `/maintenance/${id}`, undefined, token),
+    request<{ message: string }>(
+      "DELETE",
+      `/maintenance/${id}`,
+      undefined,
+      token,
+    ),
 };
 
 // ─── Payment Options ──────────────────────────────────────────────────────────
 
 export const paymentOptions = {
   list: (token: string, estateId: string) =>
-    request<PaymentOptionDTO[]>('GET', `/estates/${estateId}/payment-options`, undefined, token),
+    request<PaymentOptionDTO[]>(
+      "GET",
+      `/estates/${estateId}/payment-options`,
+      undefined,
+      token,
+    ),
 
-  create: (token: string, estateId: string, payload: { name: string; details: string }) =>
-    request<PaymentOptionDTO>('POST', `/estates/${estateId}/payment-options`, payload, token),
+  create: (
+    token: string,
+    estateId: string,
+    payload: { name: string; details: string },
+  ) =>
+    request<PaymentOptionDTO>(
+      "POST",
+      `/estates/${estateId}/payment-options`,
+      payload,
+      token,
+    ),
 
   delete: (token: string, id: string) =>
-    request<{ message: string }>('DELETE', `/payment-options/${id}`, undefined, token),
+    request<{ message: string }>(
+      "DELETE",
+      `/payment-options/${id}`,
+      undefined,
+      token,
+    ),
 };
 
 // ─── Inquiries ────────────────────────────────────────────────────────────────
 
 export const inquiries = {
   list: (token: string, estateId: string) =>
-    request<InquiryDTO[]>('GET', `/estates/${estateId}/inquiries`, undefined, token),
+    request<InquiryDTO[]>(
+      "GET",
+      `/estates/${estateId}/inquiries`,
+      undefined,
+      token,
+    ),
 
-  create: (token: string, estateId: string, payload: { houseId: string; message: string }) =>
-    request<InquiryDTO>('POST', `/estates/${estateId}/inquiries`, payload, token),
+  create: (
+    token: string,
+    estateId: string,
+    payload: { houseId: string; message: string },
+  ) =>
+    request<InquiryDTO>(
+      "POST",
+      `/estates/${estateId}/inquiries`,
+      payload,
+      token,
+    ),
 
   reply: (token: string, id: string, reply: string) =>
-    request<InquiryDTO>('PATCH', `/inquiries/${id}/reply`, { reply }, token),
+    request<InquiryDTO>("PATCH", `/inquiries/${id}/reply`, { reply }, token),
 };
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export const admin = {
   addAdmin: (token: string, email: string) =>
-    request<{ message: string }>('POST', '/admin/add-admin', { email }, token),
+    request<{ message: string }>("POST", "/admin/add-admin", { email }, token),
 
   allEstates: (token: string) =>
-    request<EstateDTO[]>('GET', '/admin/estates', undefined, token),
+    request<EstateDTO[]>("GET", "/admin/estates", undefined, token),
 };
 
 // ─── DTO Types ────────────────────────────────────────────────────────────────
@@ -167,7 +294,7 @@ export interface UserDTO {
   name: string;
   email: string;
   phone: string;
-  role: 'communest_admin' | 'estate_admin' | 'tenant' | 'regular_user';
+  role: "communest_admin" | "estate_admin" | "tenant" | "regular_user";
   profilePicture?: string;
   emailVerified: boolean;
   phoneVerified: boolean;
@@ -188,7 +315,7 @@ export interface EstateDTO {
   titleDeedNumber: string;
   estatePhoto: string;
   amenityPhotos: string[];
-  status: 'pending' | 'approved' | 'denied';
+  status: "pending" | "approved" | "denied";
   adminId: string;
   submittedAt: string;
 }
@@ -203,10 +330,10 @@ export interface HouseDTO {
   amenities: string[];
   rentAmount: number;
   managerPhone: string;
-  status: 'vacant' | 'occupied';
+  status: "vacant" | "occupied";
   occupiedAt?: string;
   tenantName?: string;
-  paymentStatus?: 'paid' | 'pending';
+  paymentStatus?: "paid" | "pending";
 }
 
 export interface ProposalDTO {
@@ -217,7 +344,7 @@ export interface ProposalDTO {
   email: string;
   phone: string;
   submittedAt: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
 }
 
 export interface NotificationDTO {
@@ -234,7 +361,7 @@ export interface MaintenanceDTO {
   estateId: string;
   title: string;
   description: string;
-  status: 'scheduled' | 'in_progress' | 'resolved';
+  status: "scheduled" | "in_progress" | "resolved";
   createdAt: string;
 }
 
@@ -254,7 +381,7 @@ export interface InquiryDTO {
   unit: string;
   message: string;
   reply?: string;
-  status: 'pending' | 'resolved';
+  status: "pending" | "resolved";
   createdAt: string;
   repliedAt?: string;
 }
