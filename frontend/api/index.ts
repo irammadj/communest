@@ -1,8 +1,4 @@
-import { projectId } from "../../utils/supabase/info";
-
-const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  `https://${projectId}.supabase.co/functions/v1/make-server-5d5fb4b7`;
+const BASE_URL = import.meta.env.VITE_BASE_API;
 
 async function request<T>(
   method: string,
@@ -10,14 +6,15 @@ async function request<T>(
   body?: unknown,
   token?: string,
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  const isFormData = body instanceof FormData;
+  if (!isFormData) headers["Content-Type"] = "application/json";
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body:
+      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: res.statusText }));
@@ -50,14 +47,40 @@ export const profile = {
 
   update: (
     token: string,
-    payload: Partial<{ name: string; phone: string; profilePicture: string }>,
-  ) => request<UserDTO>("PATCH", "/profile", payload, token),
+    payload: Partial<{ name: string; phone: string; profilePicture: File }>,
+  ) => {
+    const form = new FormData();
+    if (payload.name !== undefined) form.append("name", payload.name);
+    if (payload.phone !== undefined) form.append("phone", payload.phone);
+    if (payload.profilePicture)
+      form.append("profilePicture", payload.profilePicture);
+    return request<UserDTO>("PATCH", "/profile", form, token);
+  },
 
   deleteAccount: (token: string) =>
     request<{ message: string }>("DELETE", "/profile", undefined, token),
 };
 
 // ─── Estates ──────────────────────────────────────────────────────────────────
+
+async function imageUrlFromBlob(source: string): Promise<string> {
+  try {
+    const response = await fetch(source);
+    if (!response.ok) return source;
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  } catch {
+    return source;
+  }
+}
+
+async function normalizeEstateImages(estate: EstateDTO): Promise<EstateDTO> {
+  const [estatePhoto, amenityPhotos] = await Promise.all([
+    imageUrlFromBlob(estate.estatePhoto),
+    Promise.all(estate.amenityPhotos.map(imageUrlFromBlob)),
+  ]);
+  return { ...estate, estatePhoto, amenityPhotos };
+}
 
 export const estates = {
   list: (params?: { county?: string; maxRent?: number; search?: string }) => {
@@ -66,19 +89,54 @@ export const estates = {
     if (params?.maxRent) qs.set("maxRent", String(params.maxRent));
     if (params?.search) qs.set("search", params.search);
     const query = qs.toString();
-    return request<EstateDTO[]>("GET", `/estates${query ? `?${query}` : ""}`);
+    return request<EstateDTO[]>(
+      "GET",
+      `/estates${query ? `?${query}` : ""}`,
+    ).then((items) => Promise.all(items.map(normalizeEstateImages)));
   },
 
-  get: (id: string) => request<EstateDTO>("GET", `/estates/${id}`),
+  get: (id: string) =>
+    request<EstateDTO>("GET", `/estates/${id}`).then(normalizeEstateImages),
 
-  create: (token: string, payload: CreateEstatePayload) =>
-    request<EstateDTO>("POST", "/estates", payload, token),
+  create: (token: string, payload: CreateEstatePayload) => {
+    const form = new FormData();
+    form.append("name", payload.name);
+    form.append("location", payload.location);
+    form.append("county", payload.county);
+    form.append("units", String(payload.units));
+    form.append("totalArea", String(payload.totalArea));
+    form.append("description", payload.description ?? "");
+    form.append("managementName", payload.managementName);
+    form.append("managementEmail", payload.managementEmail);
+    form.append("managementPhone", payload.managementPhone);
+    form.append("titleDeedNumber", payload.titleDeedNumber);
+    form.append("estatePhoto", payload.estatePhoto);
+    payload.amenityPhotos?.forEach((photo) =>
+      form.append("amenityPhotos", photo),
+    );
+    return request<EstateDTO>("POST", "/estates", form, token).then(
+      normalizeEstateImages,
+    );
+  },
 
   updateStatus: (token: string, id: string, status: "approved" | "denied") =>
-    request<EstateDTO>("PATCH", `/estates/${id}/status`, { status }, token),
+    request<EstateDTO>(
+      "PATCH",
+      `/estates/${id}/status`,
+      { status },
+      token,
+    ).then(normalizeEstateImages),
 
-  updatePhoto: (token: string, id: string, estatePhoto: string) =>
-    request<EstateDTO>("PATCH", `/estates/${id}/photo`, { estatePhoto }, token),
+  updatePhoto: (token: string, id: string, estatePhoto: File) => {
+    const form = new FormData();
+    form.append("estatePhoto", estatePhoto);
+    return request<EstateDTO>(
+      "PATCH",
+      `/estates/${id}/photo`,
+      form,
+      token,
+    ).then(normalizeEstateImages);
+  },
 
   addAdmin: (token: string, estateId: string, email: string) =>
     request<{ message: string }>(
@@ -397,8 +455,8 @@ export interface CreateEstatePayload {
   managementEmail: string;
   managementPhone: string;
   titleDeedNumber: string;
-  estatePhoto: string;
-  amenityPhotos?: string[];
+  estatePhoto: File;
+  amenityPhotos?: File[];
 }
 
 export interface CreateHousePayload {

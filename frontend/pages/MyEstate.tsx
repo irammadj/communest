@@ -281,9 +281,8 @@ export default function MyEstate() {
 
   const handleChangeEstatePhoto = async (file: File) => {
     if (!token) return;
-    const photoUrl = URL.createObjectURL(file);
-    setHeroPhotoPreview(photoUrl);
-    const updated = await estatesApi.updatePhoto(token, estate.id, photoUrl);
+    setHeroPhotoPreview(URL.createObjectURL(file));
+    const updated = await estatesApi.updatePhoto(token, estate.id, file);
     setEstates((prev) =>
       prev.map((current) => (current.id === updated.id ? updated : current)),
     );

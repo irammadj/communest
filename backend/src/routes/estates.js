@@ -13,7 +13,25 @@ const {
   fail,
 } = require("../validation");
 const { ownership, asyncRoute } = require("../helpers");
+const { uploadImage, resolveImage, removeImage } = require("../storage");
+const multer = require("multer");
 const router = express.Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 11 },
+});
+const estateUpload = upload.fields([
+  { name: "estatePhoto", maxCount: 1 },
+  { name: "amenityPhotos", maxCount: 10 },
+]);
+const imageUrl = async (bucket, path) => resolveImage(bucket, path);
+const estateWithImages = async (estate) => ({
+  ...toEstateDTO(estate),
+  estatePhoto: await imageUrl("estates", estate.estate_photo),
+  amenityPhotos: await Promise.all(
+    (estate.amenity_photos || []).map((photo) => imageUrl("extras", photo)),
+  ).then((photos) => photos.filter(Boolean)),
+});
 const validateEstate = (body) => {
   if (
     !textLength(body.name, 4, 20) ||
@@ -25,8 +43,7 @@ const validateEstate = (body) => {
     !isNonEmptyString(body.county) ||
     !validEmail(body.managementEmail) ||
     !validPhone(body.managementPhone) ||
-    !isNonEmptyString(body.titleDeedNumber) ||
-    !isNonEmptyString(body.estatePhoto)
+    !isNonEmptyString(body.titleDeedNumber)
   )
     return "Please provide valid estate, management, legal, and photo details.";
   if (!inRangeInteger(body.units, 1, 1000))
@@ -86,7 +103,7 @@ router.get(
       const ids = new Set((houses || []).map((house) => house.estate_id));
       estates = estates.filter((estate) => ids.has(estate.id));
     }
-    res.json(estates.map(toEstateDTO));
+    res.json(await Promise.all(estates.map(estateWithImages)));
   }),
 );
 router.get(
@@ -99,20 +116,37 @@ router.get(
       .single();
     if (error || !data)
       return res.status(404).json({ message: "Estate not found." });
-    res.json(toEstateDTO(data));
+    res.json(await estateWithImages(data));
   }),
 );
 router.post(
   "/",
   auth,
-  requireRole("regular_user", "estate_admin"),
+  requireRole("regular_user", "communest_admin", "estate_admin"),
+  estateUpload,
   asyncRoute(async (req, res) => {
-    const validationError = validateEstate(req.body);
+    const body = {
+      ...req.body,
+      units: Number(req.body.units),
+      totalArea: Number(req.body.totalArea),
+    };
+    const validationError = validateEstate(body);
     if (validationError) return fail(res, validationError);
+    const estateFile = req.files?.estatePhoto?.[0];
+    if (!estateFile) return fail(res, "An estate photo is required.");
+    const amenityFiles = req.files?.amenityPhotos || [];
+    const estatePath = await uploadImage("estates", "estate", estateFile);
+    const amenityPaths = await Promise.all(
+      amenityFiles.map((file) => uploadImage("extras", "amenity", file)),
+    );
     const { data, error } = await supabase
       .from("estates")
       .insert({
-        ...mapInsert(req.body),
+        ...mapInsert({
+          ...body,
+          estatePhoto: estatePath,
+          amenityPhotos: amenityPaths,
+        }),
         status: "pending",
         admin_id: req.user.id,
       })
@@ -127,7 +161,7 @@ router.post(
       return res.status(500).json({ message: profileError.message });
     req.user.profile.role = "estate_admin";
     req.user.profile.estate_id = data.id;
-    res.status(201).json(toEstateDTO(data));
+    res.status(201).json(await estateWithImages(data));
   }),
 );
 router.post(
@@ -171,27 +205,36 @@ router.patch(
       .single();
     if (error || !data)
       return res.status(404).json({ message: "Estate not found." });
-    res.json(toEstateDTO(data));
+    res.json(await estateWithImages(data));
   }),
 );
 router.patch(
   "/:id/photo",
   auth,
   requireRole("estate_admin"),
+  upload.single("estatePhoto"),
   asyncRoute(async (req, res) => {
     if (!ownership(req, req.params.id))
       return res.status(403).json({ message: "Forbidden." });
-    if (!isNonEmptyString(req.body.estatePhoto))
-      return fail(res, "Estate photo is required.");
+    if (!req.file) return fail(res, "Estate photo is required.");
+    const existing = await supabase
+      .from("estates")
+      .select("estate_photo")
+      .eq("id", req.params.id)
+      .single();
+    const estatePath = await uploadImage("estates", "estate", req.file);
     const { data, error } = await supabase
       .from("estates")
-      .update({ estate_photo: req.body.estatePhoto })
+      .update({ estate_photo: estatePath })
       .eq("id", req.params.id)
       .select()
       .single();
+    console.log(data, error);
     if (error || !data)
       return res.status(404).json({ message: "Estate not found." });
-    res.json(toEstateDTO(data));
+    if (!error && existing.data)
+      await removeImage("estates", existing.data.estate_photo);
+    res.json(await estateWithImages(data));
   }),
 );
 module.exports = router;

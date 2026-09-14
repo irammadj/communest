@@ -77,7 +77,7 @@ export default function Profile() {
       setProfilePicPreview(url);
       if (token) {
         profileApi
-          .update(token, { profilePicture: url })
+          .update(token, { profilePicture: file })
           .then((updated) => {
             setUser({ ...user, profilePicture: updated.profilePicture });
           })
