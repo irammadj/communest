@@ -43,17 +43,15 @@ router.post(
             ? "An account with this email already exists."
             : error.message,
         });
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .insert({
-        id: created.user.id,
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        role: "regular_user",
-        email_verified: false,
-        phone_verified: false,
-      });
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: created.user.id,
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      role: "regular_user",
+      email_verified: false,
+      phone_verified: false,
+    });
     if (profileError) {
       await supabase.auth.admin.deleteUser(created.user.id);
       return res
