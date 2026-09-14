@@ -122,8 +122,8 @@ export default function ListYourEstate() {
         managementEmail: mgmtEmail,
         managementPhone: mgmtPhone,
         titleDeedNumber: titleDeed,
-        estatePhoto: estatePhotoPreview ?? "",
-        amenityPhotos: amenityPhotos.map((photo) => URL.createObjectURL(photo)),
+        estatePhoto,
+        amenityPhotos,
       });
       setEstates((prev) => [...prev, createdEstate]);
       setSubmitted(true);

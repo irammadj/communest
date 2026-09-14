@@ -10,6 +10,7 @@ const {
   fail,
 } = require("../validation");
 const { asyncRoute } = require("../helpers");
+const { resolveImage } = require("../storage");
 const router = express.Router();
 
 router.post(
@@ -43,17 +44,15 @@ router.post(
             ? "An account with this email already exists."
             : error.message,
         });
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .insert({
-        id: created.user.id,
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        role: "regular_user",
-        email_verified: false,
-        phone_verified: false,
-      });
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: created.user.id,
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      role: "regular_user",
+      email_verified: false,
+      phone_verified: false,
+    });
     if (profileError) {
       await supabase.auth.admin.deleteUser(created.user.id);
       return res
@@ -87,7 +86,12 @@ router.post(
       .single();
     if (profileError || !profile)
       return res.status(401).json({ message: "Profile not found." });
-    res.json({ token: data.session.access_token, user: toUserDTO(profile) });
+    const user = toUserDTO(profile);
+    user.profilePicture = await resolveImage(
+      "profiles",
+      profile.profile_picture,
+    );
+    res.json({ token: data.session.access_token, user });
   }),
 );
 

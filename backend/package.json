@@ -5,7 +5,7 @@
   "description": "Express API for Communest",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node --watch src/index.js",
     "dev": "nodemon src/index.js",
     "test": "node --test test/*.test.js"
   },
@@ -13,7 +13,8 @@
     "@supabase/supabase-js": "^2.116.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "multer": "^2.4.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
