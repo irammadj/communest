@@ -1,4 +1,9 @@
-export type UserRole = 'communest_admin' | 'estate_admin' | 'tenant' | 'regular_user' | 'outsider';
+export type UserRole =
+  | "communest_admin"
+  | "estate_admin"
+  | "tenant"
+  | "regular_user"
+  | "outsider";
 
 export interface User {
   id: string;
@@ -10,6 +15,7 @@ export interface User {
   emailVerified: boolean;
   phoneVerified: boolean;
   estateId?: string;
+  createdAt?: string;
 }
 
 export interface House {
@@ -22,10 +28,10 @@ export interface House {
   amenities: string[];
   rentAmount: number;
   managerPhone: string;
-  status: 'vacant' | 'occupied';
+  status: "vacant" | "occupied";
   occupiedAt?: string;
   tenantName?: string;
-  paymentStatus?: 'paid' | 'pending';
+  paymentStatus?: "paid" | "pending";
 }
 
 export interface Notification {
@@ -42,7 +48,7 @@ export interface MaintenanceIssue {
   estateId: string;
   title: string;
   description: string;
-  status: 'scheduled' | 'in_progress' | 'resolved';
+  status: "scheduled" | "in_progress" | "resolved";
   createdAt: string;
 }
 
@@ -62,7 +68,7 @@ export interface Inquiry {
   unit: string;
   message: string;
   reply?: string;
-  status: 'pending' | 'resolved';
+  status: "pending" | "resolved";
   createdAt: string;
   repliedAt?: string;
 }
@@ -75,7 +81,7 @@ export interface RentalProposal {
   email: string;
   phone: string;
   submittedAt: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
 }
 
 export interface Estate {
@@ -92,7 +98,7 @@ export interface Estate {
   titleDeedNumber: string;
   estatePhoto: string;
   amenityPhotos: string[];
-  status: 'pending' | 'approved' | 'denied';
+  status: "pending" | "approved" | "denied";
   adminId: string;
   submittedAt: string;
 }

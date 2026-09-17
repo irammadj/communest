@@ -145,6 +145,14 @@ export const estates = {
       { email },
       token,
     ),
+
+  admins: (token: string, estateId: string) =>
+    request<Array<{ id: string; name: string; email: string }>>(
+      "GET",
+      `/estates/${estateId}/admins`,
+      undefined,
+      token,
+    ),
 };
 
 // ─── Houses ───────────────────────────────────────────────────────────────────
@@ -357,6 +365,7 @@ export interface UserDTO {
   emailVerified: boolean;
   phoneVerified: boolean;
   estateId?: string;
+  createdAt?: string;
 }
 
 export interface EstateDTO {

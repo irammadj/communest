@@ -354,6 +354,23 @@ textarea.input-field {
   transform: translateY(-4px);
 }
 
+.card-static:hover {
+  transform: none;
+}
+
+@keyframes profileFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.profile-fade-in {
+  animation: profileFadeIn 0.2s ease both;
+}
+
 .card.group > div:first-child {
   width: 2.75rem;
   height: 2.75rem;

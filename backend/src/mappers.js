@@ -8,6 +8,7 @@ const toUserDTO = (p) => ({
   emailVerified: p.email_verified,
   phoneVerified: p.phone_verified,
   estateId: p.estate_id,
+  createdAt: p.created_at,
 });
 
 const toEstateDTO = (e) => ({

@@ -190,6 +190,23 @@ router.post(
     res.json({ message: `Estate Admin access granted to ${email}.` });
   }),
 );
+router.get(
+  "/:id/admins",
+  auth,
+  requireRole("estate_admin"),
+  asyncRoute(async (req, res) => {
+    if (!ownership(req, req.params.id))
+      return res.status(403).json({ message: "Forbidden." });
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, name, email")
+      .eq("estate_id", req.params.id)
+      .eq("role", "estate_admin")
+      .order("name");
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(data || []);
+  }),
+);
 router.patch(
   "/:id/status",
   auth,
