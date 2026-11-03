@@ -63,15 +63,13 @@ curl http://localhost:5000/health
 Create or update a `.env` file at the repository root:
 
 ```env
-VITE_API_BASE_URL=http://localhost:5000/api
+VITE_BASE_API=http://localhost:5000/api
 ```
 
-The current frontend API helper has a built-in Supabase Edge Function fallback. To use this Express backend, update its base URL to read `VITE_API_BASE_URL` (or make the equivalent change in `frontend/api/index.ts`):
+The frontend API helper reads `VITE_BASE_API` from the root `.env` file. To use the Supabase Edge Function instead, set it to:
 
 ```ts
-const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  `https://${projectId}.supabase.co/functions/v1/make-server-5d5fb4b7`;
+const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-5d5fb4b7`;
 ```
 
 Then run the frontend from the repository root with `pnpm install` followed by `pnpm dev`.
