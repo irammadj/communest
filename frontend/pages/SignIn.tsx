@@ -2,17 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useUser } from '../context/UserContext';
-import type { UserRole } from '../types';
 
 type Tab = 'signin' | 'register';
-
-const ROLE_REDIRECT: Record<UserRole, string> = {
-  communest_admin: '/admin',
-  estate_admin: '/my-estate',
-  tenant: '/my-estate',
-  regular_user: '/explore',
-  outsider: '/explore',
-};
 
 function validatePassword(pw: string) {
   return {
@@ -25,7 +16,7 @@ function validatePassword(pw: string) {
 }
 
 export default function SignIn() {
-  const { login, loginWithCredentials, registerUser } = useUser();
+  const { loginWithCredentials, registerUser } = useUser();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('signin');
 
@@ -45,19 +36,11 @@ export default function SignIn() {
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState(false);
 
-  // Demo login
-  const [demoRole, setDemoRole] = useState<UserRole>('regular_user');
-
   const pwChecks = validatePassword(regPassword);
   const pwValid = Object.values(pwChecks).every(Boolean);
 
   const emailValid = (e: string) => e.endsWith('@gmail.com') || e.endsWith('@email.com');
   const phoneValid = (p: string) => p.startsWith('+254') && p.replace('+254', '').replace(/\D/g, '').length >= 9;
-
-  const handleDemoLogin = () => {
-    login(demoRole);
-    navigate(ROLE_REDIRECT[demoRole]);
-  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,34 +109,6 @@ export default function SignIn() {
                 {t === 'signin' ? 'Sign In' : 'Register'}
               </button>
             ))}
-          </div>
-
-          {/* Demo role picker */}
-          <div className="card mb-6 p-4">
-            <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
-              Demo — select a role to preview
-            </p>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {(['communest_admin', 'estate_admin', 'tenant', 'regular_user'] as UserRole[]).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setDemoRole(r)}
-                  className="text-xs px-2.5 py-1 rounded-full font-medium transition-all"
-                  style={demoRole === r ? { background: 'var(--primary)', color: '#fff' } : { background: 'var(--muted)', color: 'var(--muted-foreground)' }}
-                >
-                  {r.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                </button>
-              ))}
-            </div>
-            <button onClick={handleDemoLogin} className="btn-outline w-full py-2 text-sm justify-center">
-              Continue as {demoRole.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
-            <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>or continue with form</span>
-            <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
           </div>
 
           {/* Sign In Form */}

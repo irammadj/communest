@@ -17,7 +17,6 @@ router.post(
   "/register",
   asyncRoute(async (req, res) => {
     const { name, email, phone, password } = req.body;
-    console.log("Help");
     if (!textLength(name, 4, 20))
       return fail(res, "Name must be between 4 and 20 characters.");
     if (!validEmail(email))
