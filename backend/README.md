@@ -30,7 +30,14 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 FRONTEND_URL=http://localhost:5173
 ```
 
-Apply the existing migration in `supabase/migrations/20240001_communest_schema.sql` through the Supabase SQL editor or your normal Supabase migration workflow.
+For development, requests from private-network IP addresses on ports `5173` or
+`8443` are also allowed automatically. In production, set `FRONTEND_URL` to the
+exact frontend origins that should be trusted.
+
+Apply the migrations in `supabase/migrations/` in filename order through the
+Supabase SQL editor or your normal migration workflow. The
+`20261126000100_data_access_indexes.sql` migration adds read indexes without
+changing or deleting existing records.
 
 ## Run
 

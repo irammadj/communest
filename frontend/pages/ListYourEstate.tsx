@@ -28,7 +28,7 @@ const COUNTIES = [
 ];
 
 export default function ListYourEstate() {
-  const { user, token } = useUser();
+  const { user, token, setUser } = useUser();
   const { setEstates } = useAppData();
   const navigate = useNavigate();
 
@@ -106,7 +106,7 @@ export default function ListYourEstate() {
       setError("Please fill in all required fields correctly.");
       return;
     }
-    if (!token) {
+    if (!token || !user) {
       setError("Please sign in again before submitting your estate.");
       return;
     }
@@ -126,6 +126,7 @@ export default function ListYourEstate() {
         amenityPhotos,
       });
       setEstates((prev) => [...prev, createdEstate]);
+      setUser({ ...user, role: "estate_admin", estateId: createdEstate.id });
       setSubmitted(true);
     } catch (requestError) {
       setError(

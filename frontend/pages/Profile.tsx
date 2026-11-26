@@ -90,6 +90,7 @@ export default function Profile() {
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [saved, setSaved] = useState(false);
+  const [profileError, setProfileError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addAdminEmail, setAddAdminEmail] = useState("");
   const [addAdminMsg, setAddAdminMsg] = useState("");
@@ -180,26 +181,32 @@ export default function Profile() {
         phone: updated.phone,
         profilePicture: updated.profilePicture,
       });
+      setProfileError("");
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch {
+    } catch (error) {
       setSaved(false);
+      setProfileError(
+        error instanceof Error ? error.message : "Unable to save profile.",
+      );
     }
   };
 
-  const handleProfilePic = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePic = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setProfilePicPreview(url);
-      if (token) {
-        profileApi
-          .update(token, { profilePicture: file })
-          .then((updated) => {
-            setUser({ ...user, profilePicture: updated.profilePicture });
-          })
-          .catch(() => undefined);
-      }
+    if (!file || !token) return;
+    try {
+      const updated = await profileApi.update(token, { profilePicture: file });
+      setProfilePicPreview(updated.profilePicture ?? null);
+      setUser({ ...user, profilePicture: updated.profilePicture });
+      setProfileError("");
+    } catch (error) {
+      setProfilePicPreview(user.profilePicture ?? null);
+      setProfileError(
+        error instanceof Error
+          ? error.message
+          : "Unable to save profile picture.",
+      );
     }
   };
 
@@ -321,6 +328,14 @@ export default function Profile() {
           </aside>
 
           <main>
+            {profileError && (
+              <p
+                role="alert"
+                className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+              >
+                {profileError}
+              </p>
+            )}
             <form onSubmit={handleSave} className="card card-static mb-6">
               <CardHeading type="user">Personal Details</CardHeading>
               <div className="flex flex-col gap-4">

@@ -18,7 +18,11 @@ const request = (path, options = {}) =>
         body += chunk;
       });
       response.on("end", () =>
-        resolve({ status: response.statusCode, body: JSON.parse(body) }),
+        resolve({
+          status: response.statusCode,
+          headers: response.headers,
+          body: body ? JSON.parse(body) : null,
+        }),
       );
     });
     request.on("error", reject);
@@ -30,6 +34,23 @@ test("health endpoint reports the API is running", async () => {
   const response = await request("/health");
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { status: "ok" });
+});
+
+test("LAN frontend origins can make API preflight requests in development", async () => {
+  const response = await request("/api/auth/login", {
+    method: "OPTIONS",
+    headers: {
+      Origin: "http://192.168.0.12:8443",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "content-type",
+    },
+  });
+
+  assert.equal(response.status, 204);
+  assert.equal(
+    response.headers["access-control-allow-origin"],
+    "http://192.168.0.12:8443",
+  );
 });
 
 test("unknown routes return the standard error shape", async () => {

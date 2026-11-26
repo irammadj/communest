@@ -50,8 +50,10 @@ VITE_BASE_API=http://localhost:5000/api
 
 1. Create or select a Supabase project.
 2. Open the Supabase SQL Editor.
-3. Run the migration in
-   `supabase/migrations/20240001_communest_schema.sql`.
+3. Run the migrations in `supabase/migrations/` in filename order:
+   `20240001_communest_schema.sql`, then
+   `20261126000100_data_access_indexes.sql`. The second migration only adds
+   indexes to speed up existing database reads; it preserves existing data.
 4. In Supabase, open **Project Settings → API** and copy the service-role
    secret. This secret is required by the backend and must never be exposed in
    frontend code.
@@ -146,10 +148,16 @@ pnpm format
   port `5000` and that the root `.env` contains
   `VITE_BASE_API=http://localhost:5000/api`.
 - **CORS errors:** make sure the frontend URL in `backend/.env` includes the
-  URL shown in the browser, normally `http://localhost:8443`.
+  URL shown in the browser. During development, private-network IP addresses
+  using ports `5173` or `8443` are allowed automatically.
 - **Authentication or database errors:** confirm that the Supabase migration
   has been applied and that `SUPABASE_URL` and
   `SUPABASE_SERVICE_ROLE_KEY` are correct.
+- **Intermittent estate image timeout:** the backend retries transient Supabase
+  Storage errors once and caches signed image URLs for up to 55 minutes to
+  avoid repeated Storage requests. If requests continue to fail, check Supabase
+  project availability and the backend terminal logs; restarting the backend
+  does not resolve an ongoing Supabase timeout.
 - **Port already in use:** stop the process using port `8443` or `5000`, then
   start the affected service again.
 

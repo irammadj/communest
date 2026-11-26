@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useUser, useAppData } from "../context/UserContext";
-import type { MaintenanceIssue } from "../types";
+import type { House, MaintenanceIssue } from "../types";
 import {
   estates as estatesApi,
   houses as housesApi,
@@ -93,6 +93,7 @@ export default function MyEstate() {
   const [showListHouseEntry, setShowListHouseEntry] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showSingleHouse, setShowSingleHouse] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   // Notification form
   const [notifTitle, setNotifTitle] = useState("");
@@ -117,9 +118,6 @@ export default function MyEstate() {
   const [houseAmenities, setHouseAmenities] = useState("");
   const [houseRent, setHouseRent] = useState("");
   const [housePhone, setHousePhone] = useState("");
-
-  // Change estate photo
-  const [heroPhotoPreview, setHeroPhotoPreview] = useState<string | null>(null);
 
   if (
     !user ||
@@ -210,14 +208,29 @@ export default function MyEstate() {
     (proposal) => proposal.estateId === estate.id,
   );
 
+  const saveRequest = async <T,>(
+    request: () => Promise<T>,
+  ): Promise<T | undefined> => {
+    setSaveError("");
+    try {
+      return await request();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Unable to save changes.",
+      );
+      return undefined;
+    }
+  };
+
   const handleAddNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!notifTitle || !notifDate || !notifDesc || !token) return;
-    const created = await notificationsApi.create(token, estate.id, {
+    const created = await saveRequest(() => notificationsApi.create(token, estate.id, {
       title: notifTitle,
       eventDate: notifDate,
       description: notifDesc,
-    });
+    }));
+    if (!created) return;
     setNotifications((prev) => [...prev, created]);
     setNotifTitle("");
     setNotifDate("");
@@ -227,10 +240,11 @@ export default function MyEstate() {
   const handleAddMaintenance = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!maintTitle || !maintDesc || !token) return;
-    const created = await maintenanceApi.create(token, estate.id, {
+    const created = await saveRequest(() => maintenanceApi.create(token, estate.id, {
       title: maintTitle,
       description: maintDesc,
-    });
+    }));
+    if (!created) return;
     setMaintenanceIssues((prev) => [...prev, created]);
     setMaintTitle("");
     setMaintDesc("");
@@ -241,7 +255,10 @@ export default function MyEstate() {
     status: MaintenanceIssue["status"],
   ) => {
     if (!token) return;
-    const updated = await maintenanceApi.updateStatus(token, id, status);
+    const updated = await saveRequest(() =>
+      maintenanceApi.updateStatus(token, id, status),
+    );
+    if (!updated) return;
     setMaintenanceIssues((prev) =>
       prev.map((issue) => (issue.id === updated.id ? updated : issue)),
     );
@@ -249,13 +266,17 @@ export default function MyEstate() {
 
   const handleDeleteMaint = async (id: string) => {
     if (!token) return;
-    await maintenanceApi.delete(token, id);
+    const result = await saveRequest(() => maintenanceApi.delete(token, id));
+    if (!result) return;
     setMaintenanceIssues((prev) => prev.filter((issue) => issue.id !== id));
   };
 
   const handleDeleteNotification = async (id: string) => {
     if (!token) return;
-    await notificationsApi.delete(token, id);
+    const result = await saveRequest(() =>
+      notificationsApi.delete(token, id),
+    );
+    if (!result) return;
     setNotifications((prev) =>
       prev.filter((notification) => notification.id !== id),
     );
@@ -264,10 +285,11 @@ export default function MyEstate() {
   const handleAddPayOption = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payName || !payDetails || !token) return;
-    const created = await paymentOptionsApi.create(token, estate.id, {
+    const created = await saveRequest(() => paymentOptionsApi.create(token, estate.id, {
       name: payName,
       details: payDetails,
-    });
+    }));
+    if (!created) return;
     setPaymentOptions((prev) => [...prev, created]);
     setPayName("");
     setPayDetails("");
@@ -275,14 +297,19 @@ export default function MyEstate() {
 
   const handleDeletePaymentOption = async (id: string) => {
     if (!token) return;
-    await paymentOptionsApi.delete(token, id);
+    const result = await saveRequest(() =>
+      paymentOptionsApi.delete(token, id),
+    );
+    if (!result) return;
     setPaymentOptions((prev) => prev.filter((option) => option.id !== id));
   };
 
   const handleChangeEstatePhoto = async (file: File) => {
     if (!token) return;
-    setHeroPhotoPreview(URL.createObjectURL(file));
-    const updated = await estatesApi.updatePhoto(token, estate.id, file);
+    const updated = await saveRequest(() =>
+      estatesApi.updatePhoto(token, estate.id, file),
+    );
+    if (!updated) return;
     setEstates((prev) =>
       prev.map((current) => (current.id === updated.id ? updated : current)),
     );
@@ -293,7 +320,10 @@ export default function MyEstate() {
     status: "paid" | "pending",
   ) => {
     if (!token) return;
-    const updated = await housesApi.updatePayment(token, houseId, status);
+    const updated = await saveRequest(() =>
+      housesApi.updatePayment(token, houseId, status),
+    );
+    if (!updated) return;
     setHouses((prev) =>
       prev.map((house) => (house.id === updated.id ? updated : house)),
     );
@@ -304,7 +334,10 @@ export default function MyEstate() {
     status: "vacant" | "occupied",
   ) => {
     if (!token) return;
-    const updated = await housesApi.updateStatus(token, houseId, status);
+    const updated = await saveRequest(() =>
+      housesApi.updateStatus(token, houseId, status),
+    );
+    if (!updated) return;
     setHouses((prev) =>
       prev.map((house) => (house.id === updated.id ? updated : house)),
     );
@@ -313,7 +346,10 @@ export default function MyEstate() {
   const handleReplyInquiry = async (id: string) => {
     const reply = replyText[id];
     if (!reply || !token) return;
-    const updated = await inquiriesApi.reply(token, id, reply);
+    const updated = await saveRequest(() =>
+      inquiriesApi.reply(token, id, reply),
+    );
+    if (!updated) return;
     setInquiries((prev) =>
       prev.map((inquiry) => (inquiry.id === updated.id ? updated : inquiry)),
     );
@@ -325,7 +361,10 @@ export default function MyEstate() {
     status: "approved" | "rejected",
   ) => {
     if (!token) return;
-    const updated = await proposalsApi.updateStatus(token, id, status);
+    const updated = await saveRequest(() =>
+      proposalsApi.updateStatus(token, id, status),
+    );
+    if (!updated) return;
     setProposals((prev) =>
       prev.map((proposal) => (proposal.id === updated.id ? updated : proposal)),
     );
@@ -352,18 +391,21 @@ export default function MyEstate() {
   const handleAddHouse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    const created = await housesApi.create(token, estate.id, {
-      houseNumber: houseNum,
-      totalArea: Number(houseArea),
-      rooms: Number(houseRooms),
-      photos: [],
-      amenities: houseAmenities
-        .split(",")
-        .map((a) => a.trim())
-        .filter(Boolean),
-      rentAmount: Number(houseRent),
-      managerPhone: housePhone,
-    });
+    const created = await saveRequest(() =>
+      housesApi.create(token, estate.id, {
+        houseNumber: houseNum,
+        totalArea: Number(houseArea),
+        rooms: Number(houseRooms),
+        photos: [],
+        amenities: houseAmenities
+          .split(",")
+          .map((a) => a.trim())
+          .filter(Boolean),
+        rentAmount: Number(houseRent),
+        managerPhone: housePhone,
+      }),
+    );
+    if (!created) return;
     setHouses((prev) => [...prev, created]);
     setHouseNum("");
     setHouseArea("");
@@ -376,10 +418,18 @@ export default function MyEstate() {
     setActiveSection("management");
   };
 
-  const heroImage = heroPhotoPreview ?? estate.estatePhoto;
+  const heroImage = estate.estatePhoto;
 
   return (
     <Layout>
+      {saveError && (
+        <div
+          role="alert"
+          className="mx-auto mt-4 max-w-5xl rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+        >
+          {saveError}
+        </div>
+      )}
       {/* Hero */}
       <section
         className="relative"

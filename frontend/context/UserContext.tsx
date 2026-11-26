@@ -259,6 +259,10 @@ interface AppDataContextType {
   paymentOptions: PaymentOption[];
   inquiries: Inquiry[];
   proposals: RentalProposal[];
+  dataError: string | null;
+  dataReloadKey: number;
+  setDataError: React.Dispatch<React.SetStateAction<string | null>>;
+  retryData: () => void;
   setEstates: React.Dispatch<React.SetStateAction<Estate[]>>;
   setHouses: React.Dispatch<React.SetStateAction<House[]>>;
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
@@ -305,6 +309,10 @@ const AppDataContext = createContext<AppDataContextType>({
   paymentOptions: [],
   inquiries: [],
   proposals: [],
+  dataError: null,
+  dataReloadKey: 0,
+  setDataError: () => {},
+  retryData: () => {},
   setEstates: () => {},
   setHouses: () => {},
   setNotifications: () => {},
@@ -326,23 +334,38 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [proposals, setProposals] = useState<RentalProposal[]>([]);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [dataReloadKey, setDataReloadKey] = useState(0);
+  const retryData = () => {
+    setDataError(null);
+    setDataReloadKey((attempt) => attempt + 1);
+  };
 
   useEffect(() => {
+    let active = true;
     const loadPublicData = async () => {
       try {
         const publicEstates = await estatesApi.list();
-        setEstates(publicEstates);
         const publicHouses = await Promise.all(
           publicEstates.map((estate) => housesApi.list(estate.id)),
         );
+        if (!active) return;
+        setEstates(publicEstates);
         setHouses(publicHouses.flat());
-      } catch {
-        setEstates([]);
-        setHouses([]);
+      } catch (error) {
+        if (active)
+          setDataError(
+            error instanceof Error
+              ? `Unable to load saved estate data: ${error.message}`
+              : "Unable to load saved estate data.",
+          );
       }
     };
     loadPublicData();
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [dataReloadKey]);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -409,49 +432,62 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!token || !user?.estateId || user.role === "regular_user") return;
+    const estateId = user?.estateId;
+    const userRole = user?.role;
+    if (!token || !estateId || userRole === "regular_user") return;
 
+    let active = true;
     const loadPrivateData = async () => {
-      const estateId = user.estateId as string;
-      const [
-        privateEstate,
-        privateHouses,
-        loadedNotifications,
-        loadedMaintenance,
-        loadedPayments,
-        loadedInquiries,
-        loadedProposals,
-      ] = await Promise.all([
-        estatesApi.get(estateId).catch(() => null),
-        housesApi.list(estateId).catch(() => []),
-        notificationsApi.list(token, estateId).catch(() => []),
-        maintenanceApi.list(token, estateId).catch(() => []),
-        paymentOptionsApi.list(token, estateId).catch(() => []),
-        user.role === "estate_admin"
-          ? inquiriesApi.list(token, estateId).catch(() => [])
-          : Promise.resolve([]),
-        user.role === "estate_admin"
-          ? proposalsApi.list(token, estateId).catch(() => [])
-          : Promise.resolve([]),
-      ]);
-      if (privateEstate) {
+      try {
+        const [
+          privateEstate,
+          privateHouses,
+          loadedNotifications,
+          loadedMaintenance,
+          loadedPayments,
+          loadedInquiries,
+          loadedProposals,
+        ] = await Promise.all([
+          estatesApi.get(estateId),
+          housesApi.list(estateId),
+          notificationsApi.list(token, estateId),
+          maintenanceApi.list(token, estateId),
+          paymentOptionsApi.list(token, estateId),
+          userRole === "estate_admin"
+            ? inquiriesApi.list(token, estateId)
+            : Promise.resolve([]),
+          userRole === "estate_admin"
+            ? proposalsApi.list(token, estateId)
+            : Promise.resolve([]),
+        ]);
+        if (!active) return;
         setEstates((previous) => [
           ...previous.filter((estate) => estate.id !== privateEstate.id),
           privateEstate,
         ]);
+        setHouses((previous) => [
+          ...previous.filter((house) => house.estateId !== estateId),
+          ...privateHouses,
+        ]);
+        setNotifications(loadedNotifications);
+        setMaintenanceIssues(loadedMaintenance);
+        setPaymentOptions(loadedPayments);
+        setInquiries(loadedInquiries);
+        setProposals(loadedProposals);
+      } catch (error) {
+        if (active)
+          setDataError(
+            error instanceof Error
+              ? `Unable to load saved estate data: ${error.message}`
+              : "Unable to load saved estate data.",
+          );
       }
-      setHouses((previous) => [
-        ...previous.filter((house) => house.estateId !== estateId),
-        ...privateHouses,
-      ]);
-      setNotifications(loadedNotifications);
-      setMaintenanceIssues(loadedMaintenance);
-      setPaymentOptions(loadedPayments);
-      setInquiries(loadedInquiries);
-      setProposals(loadedProposals);
     };
     loadPrivateData();
-  }, [token, user?.estateId, user?.role]);
+    return () => {
+      active = false;
+    };
+  }, [dataReloadKey, token, user?.estateId, user?.role]);
 
   const login = (role: UserRole) => {
     const u = role === "outsider" ? null : (DEMO_USERS[role] ?? null);
@@ -526,6 +562,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           paymentOptions,
           inquiries,
           proposals,
+          dataError,
+          dataReloadKey,
+          setDataError,
+          retryData,
           setEstates,
           setHouses,
           setNotifications,

@@ -1,18 +1,43 @@
 require("dotenv").config();
+const { isIP } = require("node:net");
 const express = require("express");
 const cors = require("cors");
 
 const app = express();
 const port = process.env.PORT || 5000;
+const development = process.env.NODE_ENV !== "production";
 const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const isPrivateLanOrigin = (origin) => {
+  if (!development) return false;
+  let url;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:" || !["5173", "8443"].includes(url.port))
+    return false;
+  if (isIP(url.hostname) !== 4) return false;
+  const [first, second] = url.hostname.split(".").map(Number);
+  return (
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+};
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin))
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        isPrivateLanOrigin(origin)
+      )
         return callback(null, true);
       return callback(new Error("Origin is not allowed by CORS."));
     },

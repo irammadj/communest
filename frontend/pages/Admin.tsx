@@ -17,7 +17,7 @@ function EstateBadge({ status }: { status: Estate["status"] }) {
 
 export default function Admin() {
   const { user, token } = useUser();
-  const { estates, setEstates } = useAppData();
+  const { dataReloadKey, estates, setEstates, setDataError } = useAppData();
   const navigate = useNavigate();
 
   const [addAdminEmail, setAddAdminEmail] = useState("");
@@ -31,9 +31,17 @@ export default function Admin() {
     if (!token || user?.role !== "communest_admin") return;
     adminApi
       .allEstates(token)
-      .then(setEstates)
-      .catch(() => undefined);
-  }, [token, user?.role, setEstates]);
+      .then((loadedEstates) => {
+        setEstates(loadedEstates);
+      })
+      .catch((error: unknown) => {
+        setDataError(
+          error instanceof Error
+            ? `Unable to load saved estate data: ${error.message}`
+            : "Unable to load saved estate data.",
+        );
+      });
+  }, [dataReloadKey, token, user?.role, setDataError, setEstates]);
 
   if (!user || user.role !== "communest_admin") {
     return (
