@@ -31,10 +31,14 @@ router.post(
         res,
         "Password must be at least 12 characters and include uppercase, lowercase, number, and symbol.",
       );
-    const { data: created, error } = await supabase.auth.admin.createUser({
+    const { error } = await supabase.auth.admin.createUser({
       email: email.trim(),
       password,
       email_confirm: true,
+      user_metadata: {
+        name: name.trim(),
+        phone: phone.trim(),
+      },
     });
     if (error)
       return res
@@ -44,25 +48,6 @@ router.post(
             ? "An account with this email already exists."
             : error.message,
         });
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: created.user.id,
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      role: "regular_user",
-      email_verified: false,
-      phone_verified: false,
-    });
-    if (profileError) {
-      await supabase.auth.admin.deleteUser(created.user.id);
-      return res
-        .status(/duplicate|unique/i.test(profileError.message) ? 409 : 500)
-        .json({
-          message: /duplicate|unique/i.test(profileError.message)
-            ? "An account with this email already exists."
-            : profileError.message,
-        });
-    }
     res.status(201).json({ message: "Account created successfully." });
   }),
 );

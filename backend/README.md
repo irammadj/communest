@@ -37,7 +37,10 @@ exact frontend origins that should be trusted.
 Apply the migrations in `supabase/migrations/` in filename order through the
 Supabase SQL editor or your normal migration workflow. The
 `20261126000100_data_access_indexes.sql` migration adds read indexes without
-changing or deleting existing records.
+changing or deleting existing records. The
+`20261126000200_create_profile_on_signup.sql` migration creates each new user's
+profile through a database trigger, so registration does not need a direct
+insert into the RLS-protected `profiles` table.
 
 ## Run
 
