@@ -517,7 +517,7 @@ export default function MyEstate() {
         {/* Overview */}
         {activeSection === "overview" && (
           <div className="animate-fade-in flex flex-col gap-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               {[
                 { label: "Management", value: estate.managementName },
                 { label: "Email", value: estate.managementEmail },
@@ -535,7 +535,7 @@ export default function MyEstate() {
                     .length,
                 },
               ].map((item) => (
-                <div key={item.label} className="card p-4">
+                <div key={item.label} className="card p-4 min-w-0">
                   <p
                     className="text-xs mb-1"
                     style={{ color: "var(--muted-foreground)" }}
@@ -543,7 +543,7 @@ export default function MyEstate() {
                     {item.label}
                   </p>
                   <p
-                    className="text-sm font-semibold"
+                    className="text-sm font-semibold break-words"
                     style={{ color: "var(--foreground)" }}
                   >
                     {item.value}

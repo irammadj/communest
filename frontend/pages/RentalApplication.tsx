@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
-import { useAppData } from "../context/UserContext";
+import { useAppData, useUser } from "../context/UserContext";
 import { proposals as proposalsApi } from "../api";
-import { Link } from "react-router-dom";
 
 export default function RentalApplication() {
   const { estateId, houseId } = useParams<{
@@ -11,22 +10,15 @@ export default function RentalApplication() {
     houseId: string;
   }>();
   const { estates, houses, setProposals } = useAppData();
+  const { user, token } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const estate = estates.find((e) => e.id === estateId);
   const house = houses.find((h) => h.id === houseId);
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
-
-  const emailValid = (e: string) =>
-    e.endsWith("@gmail.com") || e.endsWith("@email.com");
-  const phoneValid = (p: string) =>
-    p.startsWith("+254") &&
-    p.replace("+254", "").replace(/\D/g, "").length >= 9;
 
   if (!estate || !house) {
     return (
@@ -51,26 +43,15 @@ export default function RentalApplication() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (name.length < 2) {
-      setError("Please enter your full name");
-      return;
-    }
-    if (!emailValid(email)) {
-      setError("Email must end with @gmail.com or @email.com");
-      return;
-    }
-    if (!phoneValid(phone)) {
-      setError("Phone must start with +254 and have at least 9 digits");
+    if (!user || !token || user.role !== "regular_user") {
+      setError("Sign in with a regular user account before applying.");
       return;
     }
 
     try {
-      const result = await proposalsApi.create({
+      const result = await proposalsApi.create(token, {
         estateId: estate.id,
         houseId: house.id,
-        name,
-        email,
-        phone,
       });
       setProposals((prev) => [
         ...prev,
@@ -78,9 +59,9 @@ export default function RentalApplication() {
           id: result.proposalId,
           estateId: estate.id,
           houseId: house.id,
-          name,
-          email,
-          phone,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
           submittedAt: new Date().toISOString(),
           status: "pending",
         },
@@ -165,7 +146,55 @@ export default function RentalApplication() {
           </div>
         </div>
 
-        {submitted ? (
+        {!user || !token ? (
+          <div className="card text-center">
+            <h1
+              className="text-xl font-bold mb-2"
+              style={{ color: "var(--foreground)" }}
+            >
+              Sign in to apply
+            </h1>
+            <p
+              className="text-sm mb-5"
+              style={{ color: "var(--muted-foreground)" }}
+            >
+              You need a Communest account before applying. If your application
+              is approved, your account will become a tenant account.
+            </p>
+            <Link
+              to="/sign-in"
+              state={{ from: location.pathname }}
+              className="btn-primary inline-flex justify-center"
+            >
+              Sign In or Register
+            </Link>
+          </div>
+        ) : user.role !== "regular_user" ? (
+          <div className="card text-center">
+            <h1
+              className="text-xl font-bold mb-2"
+              style={{ color: "var(--foreground)" }}
+            >
+              Regular account required
+            </h1>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              Rental applications must be submitted from a regular user
+              account.
+            </p>
+          </div>
+        ) : house.status !== "vacant" ? (
+          <div className="card text-center">
+            <h1
+              className="text-xl font-bold mb-2"
+              style={{ color: "var(--foreground)" }}
+            >
+              This house is no longer available
+            </h1>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              Choose another vacant house from Explore.
+            </p>
+          </div>
+        ) : submitted ? (
           <div className="text-center py-10">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -195,8 +224,9 @@ export default function RentalApplication() {
               className="text-sm mb-6"
               style={{ color: "var(--muted-foreground)" }}
             >
-              Your rental proposal has been sent to the estate admin. You will
-              be contacted at {email} if approved.
+              Your application has been sent to the estate admin. If approved,
+              your account will become a tenant account. Sign out and back in
+              after approval to refresh your access.
             </p>
             <button
               onClick={() => navigate("/explore")}
@@ -231,10 +261,8 @@ export default function RentalApplication() {
                 <input
                   type="text"
                   className="input-field"
-                  placeholder="Your full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
+                  value={user.name}
+                  readOnly
                 />
               </div>
               <div>
@@ -247,10 +275,8 @@ export default function RentalApplication() {
                 <input
                   type="email"
                   className="input-field"
-                  placeholder="you@gmail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  value={user.email}
+                  readOnly
                 />
               </div>
               <div>
@@ -263,10 +289,8 @@ export default function RentalApplication() {
                 <input
                   type="tel"
                   className="input-field"
-                  placeholder="+254712345678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
+                  value={user.phone}
+                  readOnly
                 />
               </div>
               {error && (

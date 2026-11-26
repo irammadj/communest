@@ -5,7 +5,7 @@ const requireRole = require("../middleware/requireRole");
 const { toEstateDTO } = require("../mappers");
 const {
   textLength,
-  validEmail,
+  validContactEmail,
   validPhone,
   positiveInteger,
   inRangeInteger,
@@ -41,7 +41,7 @@ const validateEstate = (body) => {
     return "Name, location, and management name must be 4 to 20 characters.";
   if (
     !isNonEmptyString(body.county) ||
-    !validEmail(body.managementEmail) ||
+    !validContactEmail(body.managementEmail) ||
     !validPhone(body.managementPhone) ||
     !isNonEmptyString(body.titleDeedNumber)
   )
@@ -122,7 +122,7 @@ router.get(
 router.post(
   "/",
   auth,
-  requireRole("regular_user", "communest_admin", "estate_admin"),
+  requireRole("regular_user"),
   estateUpload,
   asyncRoute(async (req, res) => {
     const body = {
@@ -134,6 +134,20 @@ router.post(
     if (validationError) return fail(res, validationError);
     const estateFile = req.files?.estatePhoto?.[0];
     if (!estateFile) return fail(res, "An estate photo is required.");
+    const { data: pendingEstate, error: pendingError } = await supabase
+      .from("estates")
+      .select("id")
+      .eq("admin_id", req.user.id)
+      .eq("status", "pending")
+      .limit(1)
+      .maybeSingle();
+    if (pendingError)
+      return res.status(500).json({ message: pendingError.message });
+    if (pendingEstate)
+      return res.status(409).json({
+        message: "You already have an estate awaiting Communest Admin review.",
+      });
+
     const amenityFiles = req.files?.amenityPhotos || [];
     const estatePath = await uploadImage("estates", "estate", estateFile);
     const amenityPaths = await Promise.all(
@@ -153,14 +167,6 @@ router.post(
       .select()
       .single();
     if (error) return res.status(500).json({ message: error.message });
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({ role: "estate_admin", estate_id: data.id })
-      .eq("id", req.user.id);
-    if (profileError)
-      return res.status(500).json({ message: profileError.message });
-    req.user.profile.role = "estate_admin";
-    req.user.profile.estate_id = data.id;
     res.status(201).json(await estateWithImages(data));
   }),
 );
@@ -218,10 +224,68 @@ router.patch(
       .from("estates")
       .update({ status: req.body.status })
       .eq("id", req.params.id)
+      .eq("status", "pending")
       .select()
-      .single();
-    if (error || !data)
-      return res.status(404).json({ message: "Estate not found." });
+      .maybeSingle();
+    if (error) return res.status(500).json({ message: error.message });
+    if (!data)
+      return res
+        .status(409)
+        .json({ message: "This estate is no longer awaiting review." });
+
+    if (req.body.status === "approved") {
+      if (!data.admin_id) {
+        const { error: rollbackError } = await supabase
+          .from("estates")
+          .update({ status: "pending" })
+          .eq("id", data.id)
+          .eq("status", "approved");
+        if (rollbackError)
+          return res.status(500).json({ message: rollbackError.message });
+        return res
+          .status(409)
+          .json({ message: "This estate has no submitting account." });
+      }
+
+      const { data: promotedProfile, error: profileError } = await supabase
+        .from("profiles")
+        .update({ role: "estate_admin", estate_id: data.id })
+        .eq("id", data.admin_id)
+        .select("id")
+        .maybeSingle();
+      if (profileError || !promotedProfile) {
+        const { error: rollbackError } = await supabase
+          .from("estates")
+          .update({ status: "pending" })
+          .eq("id", data.id)
+          .eq("status", "approved");
+        if (rollbackError)
+          return res.status(500).json({ message: rollbackError.message });
+        return res.status(profileError ? 500 : 409).json({
+          message:
+            profileError?.message ||
+            "The estate owner account could not be granted admin access.",
+        });
+      }
+    } else if (data.admin_id) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ role: "regular_user", estate_id: null })
+        .eq("id", data.admin_id)
+        .eq("role", "estate_admin")
+        .eq("estate_id", data.id);
+      if (profileError) {
+        const { error: rollbackError } = await supabase
+          .from("estates")
+          .update({ status: "pending" })
+          .eq("id", data.id)
+          .eq("status", "denied");
+        if (rollbackError)
+          return res.status(500).json({ message: rollbackError.message });
+        return res.status(500).json({ message: profileError.message });
+      }
+    }
+
     res.json(await estateWithImages(data));
   }),
 );

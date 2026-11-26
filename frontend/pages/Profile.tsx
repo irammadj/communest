@@ -4,7 +4,7 @@ import Layout from "../components/Layout";
 import { useUser } from "../context/UserContext";
 import { profile as profileApi, estates as estatesApi } from "../api";
 import { houses as housesApi } from "../api";
-import type { EstateDTO, HouseDTO } from "../api";
+import type { EstateDTO, EstateSubmissionDTO, HouseDTO } from "../api";
 
 const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
   communest_admin: { label: "Communest Admin", cls: "badge badge-blue" },
@@ -99,6 +99,10 @@ export default function Profile() {
   );
   const [estate, setEstate] = useState<EstateDTO | null>(null);
   const [estateHouses, setEstateHouses] = useState<HouseDTO[]>([]);
+  const [estateSubmissions, setEstateSubmissions] = useState<
+    EstateSubmissionDTO[]
+  >([]);
+  const [estateSubmissionsError, setEstateSubmissionsError] = useState("");
   const [coAdmins, setCoAdmins] = useState<
     Array<{ id: string; name: string; email: string }>
   >([]);
@@ -136,6 +140,66 @@ export default function Profile() {
       active = false;
     };
   }, [token, estateId, role]);
+
+  useEffect(() => {
+    if (!token || !user) return;
+    let active = true;
+    profileApi
+      .estateSubmissions(token)
+      .then((submissions) => {
+        if (!active) return;
+        setEstateSubmissions(submissions);
+        const approvedSubmission = submissions.find(
+          (submission) => submission.status === "approved",
+        );
+        if (approvedSubmission && user.role === "regular_user") {
+          setUser((current) =>
+            current?.id === user.id
+              ? {
+                  ...current,
+                  role: "estate_admin",
+                  estateId: approvedSubmission.id,
+                }
+              : current,
+          );
+        } else if (
+          approvedSubmission &&
+          user.role === "estate_admin" &&
+          user.estateId !== approvedSubmission.id
+        ) {
+          setUser((current) =>
+            current?.id === user.id
+              ? { ...current, estateId: approvedSubmission.id }
+              : current,
+          );
+        } else if (
+          !approvedSubmission &&
+          user.role === "estate_admin" &&
+          submissions.some(
+            (submission) =>
+              submission.id === user.estateId &&
+              submission.status !== "approved",
+          )
+        ) {
+          setUser((current) =>
+            current?.id === user.id
+              ? { ...current, role: "regular_user", estateId: undefined }
+              : current,
+          );
+        }
+      })
+      .catch((requestError: unknown) => {
+        if (active)
+          setEstateSubmissionsError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Unable to load estate application updates.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, user?.id]);
 
   if (!user) {
     return (
@@ -420,6 +484,67 @@ export default function Profile() {
                 </span>
               </div>
             </form>
+
+            {(estateSubmissions.length > 0 || estateSubmissionsError) && (
+              <section className="card card-static mb-6">
+                <CardHeading type="home">Estate Application Updates</CardHeading>
+                {estateSubmissionsError ? (
+                  <p
+                    className="text-sm"
+                    role="alert"
+                    style={{ color: "var(--danger)" }}
+                  >
+                    {estateSubmissionsError}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {estateSubmissions.map((submission) => (
+                      <div
+                        key={submission.id}
+                        className="rounded-lg border p-3"
+                        style={{
+                          borderColor:
+                            submission.status === "denied"
+                              ? "rgba(239,68,68,0.35)"
+                              : "var(--border)",
+                          background:
+                            submission.status === "denied"
+                              ? "rgba(239,68,68,0.08)"
+                              : "var(--secondary)",
+                        }}
+                        role={submission.status === "denied" ? "alert" : undefined}
+                      >
+                        <p
+                          className="text-sm font-semibold mb-1"
+                          style={{
+                            color:
+                              submission.status === "denied"
+                                ? "var(--danger)"
+                                : "var(--foreground)",
+                          }}
+                        >
+                          {submission.status === "denied"
+                            ? "Estate application denied"
+                            : submission.status === "approved"
+                              ? "Estate application approved"
+                              : "Estate application pending"}
+                        </p>
+                        <p
+                          className="text-sm"
+                          style={{ color: "var(--muted-foreground)" }}
+                        >
+                          {submission.status === "denied"
+                            ? `Communest Admin denied your submission for ${submission.name}. Your account has not been granted Estate Admin access. You may revise the details and submit again.`
+                            : submission.status === "approved"
+                              ? `${submission.name} was approved. Your account now has Estate Admin access.`
+                              : `${submission.name} is awaiting Communest Admin review. Your account remains a Regular User until it is approved.`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* View my estate — tenant or estate admin */}
             {(user.role === "tenant" || user.role === "estate_admin") && (

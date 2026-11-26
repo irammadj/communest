@@ -25,6 +25,25 @@ router.get(
     res.json(profile);
   }),
 );
+router.get(
+  "/estate-submissions",
+  asyncRoute(async (req, res) => {
+    const { data, error } = await supabase
+      .from("estates")
+      .select("id, name, status, submitted_at")
+      .eq("admin_id", req.user.id)
+      .order("submitted_at", { ascending: false });
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(
+      (data || []).map((estate) => ({
+        id: estate.id,
+        name: estate.name,
+        status: estate.status,
+        submittedAt: estate.submitted_at,
+      })),
+    );
+  }),
+);
 router.patch(
   "/",
   upload.single("profilePicture"),
@@ -74,14 +93,8 @@ router.delete(
   "/",
   requireRole("regular_user", "tenant"),
   asyncRoute(async (req, res) => {
-    const { error } = await supabase
-      .from("profiles")
-      .delete()
-      .eq("id", req.user.id);
+    const { error } = await supabase.auth.admin.deleteUser(req.user.id);
     if (error) return res.status(500).json({ message: error.message });
-    const result = await supabase.auth.admin.deleteUser(req.user.id);
-    if (result.error)
-      return res.status(500).json({ message: result.error.message });
     res.json({ message: "Account deleted." });
   }),
 );

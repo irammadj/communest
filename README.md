@@ -53,9 +53,11 @@ VITE_BASE_API=http://localhost:5000/api
 3. Run the migrations in `supabase/migrations/` in filename order:
    `20240001_communest_schema.sql`, then
    `20261126000100_data_access_indexes.sql`, then
-   `20261126000200_create_profile_on_signup.sql`. The latter two migrations
-   preserve existing data; the final migration creates profiles automatically
-   when new Auth users are registered.
+   `20261126000200_create_profile_on_signup.sql`, then
+   `20261126000300_detach_records_on_account_deletion.sql`. The latter
+   migrations preserve existing data; they create profiles automatically
+   during signup and detach historical estate/inquiry records when an account
+   is deleted.
 4. In Supabase, open **Project Settings → API** and copy the service-role
    secret. This secret is required by the backend and must never be exposed in
    frontend code.

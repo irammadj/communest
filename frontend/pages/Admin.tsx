@@ -333,7 +333,7 @@ export default function Admin() {
                           style={{ color: "var(--muted-foreground)" }}
                         >
                           {estate.status === "approved"
-                            ? "Estate owner notified — they have been prompted to register houses."
+                            ? "Approved by Communest Admin — now listed on Explore."
                             : "Estate owner notified — they may resubmit in 1 week."}
                         </p>
                       )}

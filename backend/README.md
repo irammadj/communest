@@ -40,7 +40,9 @@ Supabase SQL editor or your normal migration workflow. The
 changing or deleting existing records. The
 `20261126000200_create_profile_on_signup.sql` migration creates each new user's
 profile through a database trigger, so registration does not need a direct
-insert into the RLS-protected `profiles` table.
+insert into the RLS-protected `profiles` table. The
+`20261126000300_detach_records_on_account_deletion.sql` migration lets an
+account be deleted without removing its estate or inquiry records.
 
 ## Run
 
@@ -61,6 +63,24 @@ Run the dependency-free smoke tests:
 ```bash
 npm test
 ```
+
+Seed realistic demo accounts and estate workflows into the Supabase project
+configured in `backend/.env`:
+
+```powershell
+$env:DEMO_SEED_CONFIRM = "YES"
+$env:DEMO_PASSWORD_COMMUNEST_ADMIN = "<Communest admin password>"
+$env:DEMO_PASSWORD_REGULAR_USER = "<Regular user password>"
+$env:DEMO_PASSWORD_ESTATE_ADMIN = "<Estate admin password>"
+$env:DEMO_PASSWORD_TENANT = "<Tenant password>"
+npm run seed:demo
+```
+
+The script refuses to overwrite accounts not marked as demo users and prints
+the login details after all records are created. It creates three approved
+estates, one Communest Admin, one regular user, three estate admins, and six
+tenants. Accounts share the password assigned to their role. Guests browse
+without signing in and have no login password.
 
 The API runs at `http://localhost:5000`. Check it with:
 
@@ -102,3 +122,8 @@ Protected requests must include `Authorization: Bearer <supabase-access-token>`.
 ## Security notes
 
 The service-role key bypasses Supabase Row Level Security and must only be used by this backend. Never put it in frontend environment variables or commit `backend/.env`. The server verifies Supabase access tokens on protected routes and checks both role and estate ownership for estate-admin actions.
+
+To manually remove an account in Supabase, delete the user from **Authentication
+→ Users**. The `profiles.id` foreign key cascades that deletion to the profile
+row. Deleting only the row from `public.profiles` leaves the Auth user in place,
+so its email remains unavailable for registration.

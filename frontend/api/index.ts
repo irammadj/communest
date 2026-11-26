@@ -45,6 +45,14 @@ export const auth = {
 export const profile = {
   get: (token: string) => request<UserDTO>("GET", "/profile", undefined, token),
 
+  estateSubmissions: (token: string) =>
+    request<EstateSubmissionDTO[]>(
+      "GET",
+      "/profile/estate-submissions",
+      undefined,
+      token,
+    ),
+
   update: (
     token: string,
     payload: Partial<{ name: string; phone: string; profilePicture: File }>,
@@ -183,17 +191,12 @@ export const houses = {
 // ─── Proposals ────────────────────────────────────────────────────────────────
 
 export const proposals = {
-  create: (payload: {
-    estateId: string;
-    houseId: string;
-    name: string;
-    email: string;
-    phone: string;
-  }) =>
+  create: (token: string, payload: { estateId: string; houseId: string }) =>
     request<{ message: string; proposalId: string }>(
       "POST",
       "/proposals",
       payload,
+      token,
     ),
 
   list: (token: string, estateId: string) =>
@@ -384,6 +387,13 @@ export interface EstateDTO {
   amenityPhotos: string[];
   status: "pending" | "approved" | "denied";
   adminId: string;
+  submittedAt: string;
+}
+
+export interface EstateSubmissionDTO {
+  id: string;
+  name: string;
+  status: "pending" | "approved" | "denied";
   submittedAt: string;
 }
 

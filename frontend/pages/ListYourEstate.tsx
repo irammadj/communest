@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
-import { useUser, useAppData } from "../context/UserContext";
+import { useUser } from "../context/UserContext";
 import { estates as estatesApi } from "../api";
 
 const COUNTIES = [
@@ -28,11 +28,12 @@ const COUNTIES = [
 ];
 
 export default function ListYourEstate() {
-  const { user, token, setUser } = useUser();
-  const { setEstates } = useAppData();
+  const { user, token } = useUser();
   const navigate = useNavigate();
 
   const [submitted, setSubmitted] = useState(false);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Estate details
   const [estateName, setEstateName] = useState("");
@@ -61,30 +62,47 @@ export default function ListYourEstate() {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
 
-  const emailValid = (e: string) =>
-    e.endsWith("@gmail.com") || e.endsWith("@email.com");
-  const phoneValid = (p: string) =>
-    p.startsWith("+254") &&
-    p.replace("+254", "").replace(/\D/g, "").length >= 9;
+  const emailValid = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const phoneValid = (phone: string) => /^\+254\d{9}$/.test(phone.trim());
 
-  const isFormValid =
-    estateName.length >= 4 &&
-    estateName.length <= 20 &&
-    location.length >= 4 &&
-    location.length <= 20 &&
-    county.length >= 4 &&
-    county.length <= 10 &&
-    Number(units) >= 1 &&
-    Number(units) <= 1000 &&
-    totalArea.length >= 1 &&
-    totalArea.length <= 6 &&
-    mgmtName.length >= 4 &&
-    mgmtName.length <= 20 &&
-    emailValid(mgmtEmail) &&
-    phoneValid(mgmtPhone) &&
-    titleDeed.length > 0 &&
-    estatePhoto !== null &&
-    agreed;
+  const validationErrors: string[] = [];
+  if (estateName.trim().length < 4 || estateName.trim().length > 20)
+    validationErrors.push("Estate name must be between 4 and 20 characters.");
+  if (location.trim().length < 4 || location.trim().length > 20)
+    validationErrors.push("Location must be between 4 and 20 characters.");
+  if (!Number.isInteger(Number(units)) || Number(units) < 1 || Number(units) > 1000)
+    validationErrors.push("Number of units must be an integer from 1 to 1000.");
+  if (!Number.isInteger(Number(totalArea)) || Number(totalArea) < 1)
+    validationErrors.push("Total area must be a positive whole number.");
+  if (mgmtName.trim().length < 4 || mgmtName.trim().length > 20)
+    validationErrors.push(
+      "Management name must be between 4 and 20 characters.",
+    );
+  if (!emailValid(mgmtEmail))
+    validationErrors.push("Enter a valid management email address.");
+  if (!phoneValid(mgmtPhone))
+    validationErrors.push("Management phone must be +254 followed by 9 digits.");
+  if (!titleDeed.trim())
+    validationErrors.push("Enter the estate's title deed number.");
+  if (!estatePhoto)
+    validationErrors.push("Upload one estate photo.");
+  if (!agreed)
+    validationErrors.push("Agree to the Terms and Conditions and Privacy Policy.");
+  const hasUserInput = Boolean(
+    estateName.trim() ||
+      location.trim() ||
+      units.trim() ||
+      totalArea.trim() ||
+      description.trim() ||
+      mgmtName.trim() ||
+      mgmtEmail.trim() ||
+      mgmtPhone.trim() ||
+      titleDeed.trim() ||
+      estatePhoto ||
+      amenityPhotos.length > 0 ||
+      agreed,
+  );
 
   const handleEstatePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -102,14 +120,17 @@ export default function ListYourEstate() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!isFormValid) {
-      setError("Please fill in all required fields correctly.");
+    if (!hasUserInput) {
+      setShowValidationErrors(false);
       return;
     }
+    setShowValidationErrors(true);
+    if (validationErrors.length > 0) return;
     if (!token || !user) {
       setError("Please sign in again before submitting your estate.");
       return;
     }
+    setIsSubmitting(true);
     try {
       const createdEstate = await estatesApi.create(token, {
         name: estateName,
@@ -125,8 +146,6 @@ export default function ListYourEstate() {
         estatePhoto,
         amenityPhotos,
       });
-      setEstates((prev) => [...prev, createdEstate]);
-      setUser({ ...user, role: "estate_admin", estateId: createdEstate.id });
       setSubmitted(true);
     } catch (requestError) {
       setError(
@@ -134,10 +153,12 @@ export default function ListYourEstate() {
           ? requestError.message
           : "Estate submission failed.",
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  if (!user || (user.role !== "regular_user" && user.role !== "estate_admin")) {
+  if (!user || user.role !== "regular_user") {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh] text-center px-6">
@@ -152,7 +173,7 @@ export default function ListYourEstate() {
               className="mb-6 text-sm"
               style={{ color: "var(--muted-foreground)" }}
             >
-              This page is only available to Regular Users and Estate Admins.
+              This page is only available to Regular Users.
             </p>
             <button
               onClick={() => navigate("/sign-in")}
@@ -229,14 +250,18 @@ export default function ListYourEstate() {
               style={{ color: "var(--muted-foreground)" }}
             >
               Your estate has been submitted to the Communest Admin for review.
-              You will be notified by email once a decision is made.
+              Your account will become an Estate Admin only if it is approved.
             </p>
             <button onClick={() => navigate("/")} className="btn-primary">
               Back to Home
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-8"
+            noValidate
+          >
             {/* Estate Details */}
             <section>
               <h2
@@ -409,7 +434,7 @@ export default function ListYourEstate() {
                       className="text-xs mt-1"
                       style={{ color: "var(--muted-foreground)" }}
                     >
-                      Must end with @gmail.com or @email.com
+                      Use a valid email address, such as office@company.com
                     </p>
                   </div>
                   <div>
@@ -431,7 +456,7 @@ export default function ListYourEstate() {
                       className="text-xs mt-1"
                       style={{ color: "var(--muted-foreground)" }}
                     >
-                      Must start with +254
+                      Use +254 followed by exactly 9 digits
                     </p>
                   </div>
                 </div>
@@ -636,8 +661,27 @@ export default function ListYourEstate() {
               </label>
             </section>
 
+            {showValidationErrors &&
+              hasUserInput &&
+              validationErrors.length > 0 && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm"
+                style={{ color: "var(--danger)" }}
+              >
+                <p className="font-semibold">
+                  Please fix these issues before submitting:
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {validationErrors.map((validationError) => (
+                    <li key={validationError}>{validationError}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {error && (
-              <p className="text-sm" style={{ color: "var(--danger)" }}>
+              <p role="alert" className="text-sm" style={{ color: "var(--danger)" }}>
                 {error}
               </p>
             )}
@@ -645,13 +689,13 @@ export default function ListYourEstate() {
             <button
               type="submit"
               className="btn-primary w-full justify-center py-3.5 text-base"
-              disabled={!isFormValid}
+              disabled={isSubmitting}
               style={{
-                opacity: isFormValid ? 1 : 0.5,
-                cursor: isFormValid ? "pointer" : "not-allowed",
+                opacity: isSubmitting ? 0.5 : 1,
+                cursor: isSubmitting ? "not-allowed" : "pointer",
               }}
             >
-              Submit for Approval
+              {isSubmitting ? "Submitting..." : "Submit for Approval"}
             </button>
           </form>
         )}

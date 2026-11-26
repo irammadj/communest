@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useUser } from '../context/UserContext';
 
@@ -18,6 +18,7 @@ function validatePassword(pw: string) {
 export default function SignIn() {
   const { loginWithCredentials, registerUser } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
   const [tab, setTab] = useState<Tab>('signin');
 
   // Sign-in state
@@ -49,7 +50,12 @@ export default function SignIn() {
     if (!siPassword) { setSiError('Please enter your password'); return; }
     try {
       await loginWithCredentials(siEmail, siPassword);
-      navigate('/explore');
+      const returnPath = (location.state as { from?: unknown } | null)?.from;
+      navigate(
+        typeof returnPath === 'string' && returnPath.startsWith('/')
+          ? returnPath
+          : '/explore',
+      );
     } catch (err: any) {
       setSiError(err.message ?? 'Sign in failed. Please try again.');
     }

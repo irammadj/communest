@@ -56,7 +56,7 @@ const ROLE_BADGE_CLASSES: Record<UserRole, string> = {
   outsider: 'badge badge-gray',
 };
 
-const SHOW_LIST_ESTATE: UserRole[] = ['regular_user', 'estate_admin'];
+const SHOW_LIST_ESTATE: UserRole[] = ['regular_user'];
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, isLoggedIn, logout } = useUser();
@@ -144,7 +144,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               </NavLink>
             ))}
 
-            {/* List Your Estate — only for regular_user and estate_admin */}
+            {/* List Your Estate — only for regular_user */}
             {SHOW_LIST_ESTATE.includes(role) && (
               <button
                 onClick={() => handleNav('/list-your-estate')}

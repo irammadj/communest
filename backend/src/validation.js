@@ -1,4 +1,5 @@
 const EMAIL_RE = /^[^\s@]+@(gmail\.com|email\.com)$/i;
+const CONTACT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^\+254\d{9}$/;
 const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/;
 
@@ -10,6 +11,10 @@ const textLength = (value, min, max) =>
   value.trim().length <= max;
 const validEmail = (value) =>
   typeof value === "string" && EMAIL_RE.test(value.trim());
+const validContactEmail = (value) =>
+  typeof value === "string" &&
+  value.trim().length <= 254 &&
+  CONTACT_EMAIL_RE.test(value.trim());
 const validPhone = (value) =>
   typeof value === "string" && PHONE_RE.test(value.trim());
 const validPassword = (value) =>
@@ -25,6 +30,7 @@ module.exports = {
   isNonEmptyString,
   textLength,
   validEmail,
+  validContactEmail,
   validPhone,
   validPassword,
   positiveInteger,
